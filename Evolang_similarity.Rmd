@@ -1,0 +1,77 @@
+---
+title: "Evolang_similarity"
+author: "Šárka Kadavá"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Intro
+
+This is an R Markdown for similarity analysis of sound signal.
+
+First we setup our folders
+
+```{r folders, echo=FALSE}
+
+#get current drive
+curfolder   <- dirname(getwd())
+project_folder <- paste0(curfolder, "/sound_similarity/")
+audio_path  <- paste0(project_folder, "segments/")
+audio_files <- list.files(audio_path,
+                         pattern = "*.wav",
+                         recursive = TRUE,
+                         all.files = FALSE,
+                         full.names = TRUE)
+
+print(curfolder)
+print(audio_path)
+```
+
+
+## Extracting features from sound
+
+We use package 'soundgen' to extract a package of features for sound signal
+More info here: https://www.rdocumentation.org/packages/soundgen/versions/2.6.0 or here: https://cogsci.se/soundgen/acoustic_analysis.html
+
+```{r soundgen}
+
+library(soundgen)
+library(tuneR)
+
+# list of features
+feature_df <- data.frame()
+
+# FLAGGED
+## there are warnings about windowLength
+## and also pspectrum ('pspectrum' has to be a numeric matrix)
+
+for (file in audio_files) {
+  audio <- readWave(file)
+  features <- analyze(audio)
+  
+  # Convert the features into a data frame
+  features_df <- as.data.frame(t(features))
+  
+  # Add a column to the data frame to store the file name
+  features_df$File <- file
+  
+  # Append the features for this file to the main data frame
+  feature_df <- rbind(feature_df, features_df)
+}
+
+# Reset row names and remove them
+row.names(feature_df) <- NULL
+
+# Print the data frame with features
+print(feature_df)
+
+```
+
+
+
+
+
