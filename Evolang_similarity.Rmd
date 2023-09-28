@@ -20,6 +20,7 @@ First we setup our folders
 #get current drive
 curfolder   <- dirname(getwd())
 project_folder <- paste0(curfolder, "/sound_similarity/")
+dataset_folder <- paste0(project_folder, "/datasets/")
 audio_path  <- paste0(project_folder, "segments/")
 audio_files <- list.files(audio_path,
                          pattern = "*.wav",
@@ -30,6 +31,27 @@ audio_files <- list.files(audio_path,
 print(curfolder)
 print(audio_path)
 ```
+```{r duration}
+
+# Replace 'your_file.txt' with the path to your .txt file
+txt_path <- paste0(project_folder, "duration_log.txt")
+
+# Use read.table if the file is tab-separated or has a different delimiter
+# For comma-separated files, you can use read.csv
+# Set the 'sep' argument accordingly to specify the delimiter
+# In this example, I assume the file is tab-separated
+data_df <- read.table(txt_path, header = FALSE, sep = '\t')
+
+# Print the first few rows of the data frame to check the import
+head(data_df)
+
+# What is the minimum duration
+min(data_df$V5) #18 ms
+mean(data_df$V5) # 354 ms
+
+
+```
+
 
 
 ## Extracting features from sound
@@ -40,27 +62,35 @@ More info here: https://www.rdocumentation.org/packages/soundgen/versions/2.6.0 
 ```{r soundgen}
 
 library(soundgen)
-library(tuneR)
+#library(tuneR)
 
-# list of features
+# Create an empty data frame to store the features
 feature_df <- data.frame()
 
-# FLAGGED
-## there are warnings about windowLength
-## and also pspectrum ('pspectrum' has to be a numeric matrix)
+# Create a function to extract summary features from the analyze output
+extract_summary_features <- function(file, analyze_result) {
+  summary_features <- analyze_result$summary
+  # Add the filename as the first column
+  summary_features <- cbind(File = file, summary_features)
+  return(summary_features)
+}
 
+# Loop over the .wav files in the directory and extract summary features
 for (file in audio_files) {
-  audio <- readWave(file)
-  features <- analyze(audio)
+  # Check if the file name ends with '_p ', and skip processing if it does
+  if (endsWith(file, "_p .wav")) {
+    print(paste("Skipping file:", file))
+    next  # Skip this file and continue with the next iteration
+  }
+  print(paste("Analyzing file:", file))
+  #audio <- readWave(file)
+  features <- analyze(file, samplingRate = 44100, windowLength = 10, step = 5)
   
-  # Convert the features into a data frame
-  features_df <- as.data.frame(t(features))
+  # Extract and format summary features
+  summary_features_df <- extract_summary_features(file, features)
   
-  # Add a column to the data frame to store the file name
-  features_df$File <- file
-  
-  # Append the features for this file to the main data frame
-  feature_df <- rbind(feature_df, features_df)
+  # Append the summary features for this file to the main data frame
+  feature_df <- rbind(feature_df, summary_features_df)
 }
 
 # Reset row names and remove them
@@ -69,6 +99,11 @@ row.names(feature_df) <- NULL
 # Print the data frame with features
 print(feature_df)
 
+# Create the full file path including the folder and file name
+output_file <- paste0(dataset_folder, "/segments_soundgen_summary.csv")
+
+# Save the data frame as a CSV file
+write.csv(feature_df, file = output_file, row.names = FALSE)
 ```
 
 
