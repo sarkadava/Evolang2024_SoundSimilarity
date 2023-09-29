@@ -59,7 +59,9 @@ mean(data_df$V5) # 354 ms
 We use package 'soundgen' to extract a package of features for sound signal
 More info here: https://www.rdocumentation.org/packages/soundgen/versions/2.6.0 or here: https://cogsci.se/soundgen/acoustic_analysis.html
 
-```{r soundgen}
+
+Now we extract summary of features in segments
+```{r soundgen, segments}
 
 library(soundgen)
 #library(tuneR)
@@ -106,6 +108,12 @@ output_file <- paste0(dataset_folder, "/segments_soundgen_summary.csv")
 write.csv(feature_df, file = output_file, row.names = FALSE)
 ```
 
+Now we extract features as timeseries from the events
+```{r soundgen, events}
+
+
+
+```
 
 
 
