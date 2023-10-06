@@ -21,7 +21,7 @@ First we setup our folders
 curfolder   <- dirname(getwd())
 project_folder <- paste0(curfolder, "/sound_similarity/")
 dataset_folder <- paste0(project_folder, "/datasets/")
-audio_path  <- paste0(project_folder, "segments/")
+audio_path  <- paste0(project_folder, "data/segments_new/")
 audio_files <- list.files(audio_path,
                          pattern = "*.wav",
                          recursive = TRUE,
@@ -35,13 +35,15 @@ audio_detailed <- list.files(audio_orig,
                          all.files = FALSE,
                          full.names = TRUE)
 
+plots_folder <- paste0(project_folder, "/plots/")
+
 print(curfolder)
 print(audio_path)
 ```
 ```{r duration}
 
 # Replace 'your_file.txt' with the path to your .txt file
-txt_path <- paste0(project_folder, "duration_log.txt")
+txt_path <- paste0(project_folder, "data/duration_Ola.txt")
 
 # Use read.table if the file is tab-separated or has a different delimiter
 # For comma-separated files, you can use read.csv
@@ -112,18 +114,26 @@ row.names(feature_df) <- NULL
 print(feature_df)
 
 # Create the full file path including the folder and file name
-output_file <- paste0(dataset_folder, "/segments_soundgen_summary.csv")
+output_file <- paste0(dataset_folder, "/segments_soundgen_summary_new.csv")
 
 # Save the data frame as a CSV file
 write.csv(feature_df, file = output_file, row.names = FALSE)
 ```
+Load in the dataset if you do not have it in the environment
+```{r loading df}
+library(readr)
+
+dataset_path <- file.path(dataset_folder, "/segments_soundgen_summary_new.csv")
+data <- read_csv(dataset_path)
+
+```
+
+
 
 ```{r data wrangling}
 
 library(tidyr)
 library(dplyr)
-
-data <- feature_df
 
 # Split the 'file' column into separate columns
 data <- data %>%
@@ -171,7 +181,54 @@ data <- data %>%
 
 ```
 
+We decided to take into account only mean and sd, as the mean might be more representative of the variability within the segment then a median (since it's not always linear)
+```{r median out}
 
+# Get the column names of your_data
+column_names <- names(data)
+
+# Create a logical vector indicating which columns to keep (those that don't contain '_median')
+columns_to_keep <- !grepl("_median", column_names)
+
+# Use indexing to select only the columns you want to keep
+data <- data[, columns_to_keep]
+
+```
+
+Let's also remove columns where the values are mostly NAs, they are not really informative
+```{r NAs out}
+
+# we need to remove NA columns first
+# Function to remove columns with NAs
+remove_columns_with_na <- function(dataset) {
+  # Find column indices with NAs
+  na_columns <- apply(is.na(dataset), 2, any)
+  
+  # Subset the dataset to remove columns with NAs
+  cleaned_dataset <- dataset[, !na_columns]
+  
+  return(cleaned_dataset)
+}
+
+# Remove columns with NAs
+data <- remove_columns_with_na(data)
+print(data)
+
+# we also got some warning for roughness, so let's just delete them
+
+# Get the column names of your_data
+column_names <- names(data)
+
+# Create a logical vector indicating which columns to keep (those that don't contain 'roughness')
+columns_to_keep <- !grepl("roughness", column_names)
+
+# Use indexing to select only the columns you want to keep
+data <- data[, columns_to_keep]
+
+
+```
+
+Now let's run umap on these clean data and reduce the multi-dimensional space
 
 ```{r umap}
 
@@ -182,6 +239,7 @@ library(plotly) #for some interactivity in your plots
 
 # what are the features
 feats <- data[,7:ncol(data)]
+
 # delete the category
 feats <- feats %>%
   select(-category)
@@ -191,111 +249,321 @@ feats_scaled[is.na(feats_scaled)] <- 0 #remove all
 umap_result <- umap(feats_scaled, n_components = 2) #perform umap
 
 # add umap coordinates to the feature data
-umap_df <- data.frame(umap1 = umap_result$layout[, 1], umap2 = umap_result$layout[, 2], word = data$word, participant = data$participant, category = data$category, segment = data$segmentCount, trial = data$trial)
+umap_df <- data.frame(umap1 = umap_result$layout[, 1], umap2 = umap_result$layout[, 2], concept = data$word, participant = data$participant, category = data$category, segment = data$segmentCount, trial = data$trial)
+
+# Create the full file path including the folder and file name
+output_file <- paste0(dataset_folder, "/umap_df.csv")
+
+# Save the data frame as a CSV file
+write.csv(umap_df, file = output_file, row.names = FALSE)
+
 
 library(viridis)
 library(ggforce)
 
-# Generate a list of 50 distinct and non-repeating colors from the 'viridis' palette
-distinguishable_colors <- viridis_pal(option = "D")(50)
+# plot umap, displaying categories
+umap1 <- ggplot(umap_df, aes(x = umap1, y = umap2, color = category, text = participant)) +
+  geom_point(alpha = 0.7, size = 3) +  # Increase point size
+  labs(title = "UMAP Plot of Vocal Segments", x = "UMAP Dimension 1", y = "UMAP Dimension 2") +
+  scale_color_viridis(discrete = TRUE) +
+  theme_minimal() +  # Use a minimal theme
+  theme(plot.title = element_text(hjust = 0.5)) 
+ggplotly(umap1)
 
-# plot
-color_palette <- c("red", "white", "blue", "pink", "orange")
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "Umap_cat.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
 
-a <- ggplot(umap_df, aes(x = umap1, y = umap2, color = trial, text = participant)) +
-  geom_point(alpha=0.7) +
-  geom_line(aes(group = trial), color = "gray", alpha = 0.5) +  # Add this line
-  labs(title = "UMAP Plot of Vocal Segments", x = "UMAP Dimension 1", y = "UMAP Dimension 2") +scale_color_manual(name = "Category", values = distinguishable_colors)+ theme_dark()
-ggplotly(a)
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, umap1, width = 8, height = 6, dpi = 300) 
 
 
+# plot umap, displaying words
+
+
+umap2 <- ggplot(umap_df, aes(x = umap1, y = umap2, color = concept, text = participant)) +
+  geom_point(alpha = 0.7, size = 3) +  # Increase point size
+  labs(title = "UMAP Plot of Vocal Segments", x = "UMAP Dimension 1", y = "UMAP Dimension 2") +
+  scale_color_viridis(discrete = TRUE) +
+  theme_minimal() +  # Use a minimal theme
+  theme(plot.title = element_text(hjust = 0.5)) 
+ggplotly(umap2)
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "Umap_concept.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, umap2, width = 8, height = 6, dpi = 300) 
 
 ```
-
 
 Let's take a look on the inter-segment distance. Some of the words' segments might travel through space more than others
 
+Let's take distance of segments based on the features
+Better don't run it, takes an hour or so. Load the interseg df
 ```{r intersegment distance}
 
+# Euclidean distance between segments and feature set
+# distance segement1(s1) with segment2 (s2) is the distance between a feature set if s1 (f1) and s2 (f2), where distance(s1,s2) = sqrt(f1_feature1-f2_feature1)^2+...+  (f1_featurei-f2_featurej)^2)
 
-umap_df$trial <- as.factor(umap_df$trial)
-umap_df$participant <- as.factor(umap_df$participant)
+#x = vector of features 1
+#y = vector of features 2
+#distance = sqrt(sum((x-y)^2))
 
-# Function to calculate Euclidean distance between two points
-euclidean_distance <- function(x1, y1, x2, y2) {
-  sqrt((x1 - x2)^2 + (y1 - y2)^2)
+# delete the category
+data_dist <- data %>%
+  select(-category)
+
+# distances
+calculate_distance <- function(features_s1, features_s2) {
+  # Calculate the squared differences for each feature
+  squared_differences <- (features_s1 - features_s2)^2
+  # Calculate the sum of squared differences
+  sum_squared_differences <- sum(squared_differences)
+  # Calculate the distance by taking the square root
+  eucl_distance <- sqrt(sum_squared_differences)
+  
+  return(eucl_distance)
 }
 
-# Calculate pairwise Euclidean distances within each trial
-avg_distances <- umap_df %>%
-  group_by(participant, trial) %>%
-  arrange(trial, segment) %>%
-  mutate(
-    next_x = lead(umap1),
-    next_y = lead(umap2)
-  ) %>%
-  filter(!is.na(next_x) & !is.na(next_y)) %>%
-  summarize(Avg_Distance = mean(euclidean_distance(umap1, umap2, next_x, next_y)))
+calculate_distance(data_dist[1,7:ncol(data_dist)], data_dist[2,7:ncol(data_dist)])#better name
+
+calculate_distances_to_all <- function(target_segment_index, dataset, start_col) {
+  target_segment <- dataset[target_segment_index, start_col:ncol(dataset)]
+  distances <- numeric(nrow(dataset))
+  print
+  for (i in 1:nrow(dataset)) {
+    distances[i] <- calculate_distance(target_segment, dataset[i, start_col:ncol(dataset)])
+  }
+  
+  return(distances)
+}
+
+
+interSeg_distance <- data.frame(matrix(0, nrow = nrow(data_dist), ncol = nrow(data_dist)))
+
+# make individual ID for each segment
+data_dist <- data_dist %>%
+  mutate(ID = paste(participant, trial, segmentCount, sep = "_")) %>%
+  select(ID, everything())
+
+#concat participant-trial-segment
+
+for (s in 1:nrow(data_dist)) {
+  id <- data_dist$ID[s]  # collect ID for that specific row/column
+  interSeg_distance_vector <- calculate_distances_to_all(s, data_dist, 8) 
+  rownames(interSeg_distance)[s] <- id  # Set row name
+  colnames(interSeg_distance)[s] <- id
+  interSeg_distance[s,] <- interSeg_distance_vector
+  
+}
+
+# Create the full file path including the folder and file name
+output_file <- paste0(dataset_folder, "/distance_matrix.csv")
+
+# Save the data frame as a CSV file
+write.csv(interSeg_distance, file = output_file, row.names = FALSE)
+
+
+```
+
+Let's now get for each event, list of IDs, so we can later index those in distance matrix
+```{r mean distance per trial}
+
+IDs_list <- data_dist %>%
+  group_by(trial, participant) %>%
+  summarise(Unique_IDs = list(unique(ID))) %>%
+  ungroup()
+
+# Calculate a mean distance for each of the list-trial
+
+# Initialize a vector to store mean distances
+mean_distances <- numeric()
+
+
+# Loop through each combination in the 'result' data frame
+for (i in 1:nrow(IDs_list)) {
+  # Extract the list of unique IDs for the current combination
+  id_list <- IDs_list$Unique_IDs[[i]]
+  
+  # Select the relevant rows and columns in the distance matrix
+  subset_matrix <- interSeg_distance[id_list, id_list]
+
+  # Calculate the mean distance for the current combination
+  mean_segments <- sapply(subset_matrix, mean, na.rm = TRUE) # mean(df) does not work
+  mean_distance <- mean(mean_segments)
+  
+  # Append the mean distance to the vector
+  mean_distances <- c(mean_distances, mean_distance)
+}
+
+
+# Now let's append the mean distance within trial to the ID list
+
+IDs_list$Dist_mean <- NA
+IDs_list$Dist_mean <- mean_distances
+
 
 # merge the original df with avg distance
 
-umap_df <- merge(umap_df, avg_distances, by.x = c("trial", "participant"), by.y = c("trial", "participant"))
+data_dist_avg <- merge(data_dist, IDs_list, by.x = c("trial", "participant"), by.y = c("trial", "participant"))
+data_dist_avg
 
 # what is the distribution
-hist(avg_distances$Avg_Distance)
+hist(IDs_list$Dist_mean)
 
 # plot the avg distance between segments per category
-ggplot(umap_df, aes(x = category, y = Avg_Distance)) +
-  geom_point(size = 3, color = "red") +
-  geom_boxplot(width = 0.2, fill = "orange", alpha = 0.5) +  # Add boxplot
-  labs(title = "Avg Distance Between Segments Across Categories",
-       x = "Category", y = "Average Distance")
+
+# first we need to put back category
+# Merge the mapping with your original DataFrame 'df' based on the 'concept' column
+data_dist_avg <- merge(data_dist_avg, concept_category_mapping, by.x = "word", by.y = "concept", all.x = TRUE)
+
+# delete the unique list so we can save it
+data_dist_avg <- data_dist_avg %>%
+  select(-Unique_IDs)
+
+# Create the full file path including the folder and file name
+output_file <- paste0(dataset_folder, "/meanDist_pertrial.csv")
+
+# Save the data frame as a CSV file
+write.csv(data_dist_avg, file = output_file, row.names = FALSE)
+
+
+library(ggplot2)
+library(viridis)
+
+# Create a ggplot
+plot1 <- ggplot(data_dist_avg, aes(x = reorder(category, -Dist_mean), y = Dist_mean)) +
+  geom_point(size = 2, color = viridis(1, option = "A"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "Average Distance Between Segments Across Categories",
+       x = "Category", y = "Average Distance per Trial") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "MeanDist_categ.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, plot1, width = 8, height = 6, dpi = 300) 
+
+# plot the same but for each word
+plot2 <- ggplot(data_dist_avg, aes(x = reorder(word, -Dist_mean), y = Dist_mean)) +
+  geom_point(size = 2, color = viridis(1, option = "B"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "Average Distance Between Segments Across Concepts",
+       x = "Concept", y = "Average Distance per Trial") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none", 
+        axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "MeanDist_concept.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, plot2, width = 8, height = 6, dpi = 300) 
+
 
 ```
-Do the same, but across words
-```{r eucl distance between words}
 
-# Calculate pairwise Euclidean distances for each word
-avg_distances_word <- umap_df %>%
-  group_by(word) %>%
-  mutate(
-    next_x = lead(umap1),
-    next_y = lead(umap2)
-  ) %>%
-  filter(!is.na(next_x) & !is.na(next_y)) %>%
-  summarize(Avg_Distance_word = mean(euclidean_distance(umap1, umap2, next_x, next_y)))
+Let's now take a look not what is the variability within trial, but within a participant
 
-# merge with main
-similarity <- merge(umap_df, avg_distances_word, by.x = "word", by.y = "word")
-
-# plot
-ggplot(similarity, aes(x = category, y = Avg_Distance_word)) +
-  geom_point(size = 3, color = "red") +
-  geom_boxplot(width = 0.2, fill = "orange", alpha = 0.5) +  # Add boxplot
-  labs(title = "Avg Distance Between Words Across Categories",
-       x = "Category", y = "Average Distance")
-
-
-```
-Alternative: calculate mean of euclDistance between segments per word
 ```{r}
 
-# Alternative: calculate mean of euclDistance between segments per word
-distance_avg_segments_avg_per_word <- umap_df %>%
-  group_by(word) %>%
-  summarize(mean_euclDist = mean(Avg_Distance))
+IDs_list_pcn <- data_dist %>%
+  group_by(participant) %>%
+  summarise(Unique_IDs = list(unique(ID))) %>%
+  ungroup()
 
-distance_avg <- merge(umap_df, distance_avg_segments_avg_per_word, by.x = "word", by.y = "word")
+# Calculate a mean distance for each of the list-trial
 
-ggplot(distance_avg, aes(x = category, y = mean_euclDist)) +
-  geom_point(size = 3, color = "red") +
-  geom_boxplot(width = 0.2, fill = "orange", alpha = 0.5) +  # Add boxplot
-  labs(title = "Avg Distance Between Segments per Word Across Categories",
-       x = "Category", y = "Average Distance")
+# Initialize a vector to store mean distances
+mean_distances_pcn <- numeric()
+
+
+# Loop through each combination in the 'result' data frame
+for (i in 1:nrow(IDs_list_pcn)) {
+  # Extract the list of unique IDs for the current combination
+  id_list <- IDs_list_pcn$Unique_IDs[[i]]
+  
+  # Select the relevant rows and columns in the distance matrix
+  subset_matrix <- interSeg_distance[id_list, id_list]
+
+  # Calculate the mean distance for the current combination
+  mean_segments <- sapply(subset_matrix, mean, na.rm = TRUE) # mean(df) does not work
+  mean_distance <- mean(mean_segments)
+  
+  # Append the mean distance to the vector
+  mean_distances_pcn <- c(mean_distances_pcn, mean_distance)
+}
+
+
+# Now let's append the mean distance within trial to the ID list
+
+IDs_list_pcn$Dist_mean <- NA
+IDs_list_pcn$Dist_mean <- mean_distances_pcn
+
+
+# merge the original df with avg distance
+
+data_dist_avg_pcn <- merge(data_dist, IDs_list_pcn, by.x = "participant", by.y = "participant")
+data_dist_avg_pcn
+
+
+# Merge the mapping with your original DataFrame 'df' based on the 'concept' column
+data_dist_avg_pcn <- merge(data_dist_avg_pcn, concept_category_mapping, by.x = "word", by.y = "concept", all.x = TRUE)
+
+
+# delete the unique list so we can save it
+data_dist_avg_pcn <- data_dist_avg_pcn %>%
+  select(-Unique_IDs)
+
+# Create the full file path including the folder and file name
+output_file <- paste0(dataset_folder, "/meanDist_perpcn.csv")
+
+# Save the data frame as a CSV file
+write.csv(data_dist_avg_pcn, file = output_file, row.names = FALSE)
+
+# Create a ggplot
+plot3 <- ggplot(data_dist_avg_pcn, aes(x = reorder(category, -Dist_mean), y = Dist_mean)) +
+  geom_point(size = 2, color = viridis(1, option = "A"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "Average Distance Between Segments Across Categories",
+       x = "Category", y = "Average Distance per Participant") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "MeanDist_categ_pcn.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, plot3, width = 8, height = 6, dpi = 300) 
+
+# plot the same but for each word
+plot4 <- ggplot(data_dist_avg_pcn, aes(x = reorder(word, -Dist_mean), y = Dist_mean)) +
+  geom_point(size = 2, color = viridis(1, option = "B"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "Average Distance Between Segments Across Concepts",
+       x = "Concept", y = "Average Distance per Participant") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none", 
+        axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "MeanDist_concept_pcn.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, plot4, width = 8, height = 6, dpi = 300) 
 
 
 ```
 
+
+
+
+
+
+
+For later maybe....
 
 Now we extract features as timeseries from the events
 ```{r soundgen, events}
