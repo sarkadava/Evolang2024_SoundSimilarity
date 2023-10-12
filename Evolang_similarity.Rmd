@@ -175,6 +175,7 @@ concept_category_mapping <- data.frame(
 data <- merge(data, concept_category_mapping, by.x = "word", by.y = "concept", all.x = TRUE)
 
 # Remove the 'File' column
+
 data <- data %>%
   select(-File)
 
@@ -446,6 +447,12 @@ plot_filename <- file.path(plots_folder, "MeanDist_categ.png")  # You can choose
 # Save the plot in high resolution to the specified folder and filename
 ggsave(plot_filename, plot1, width = 8, height = 6, dpi = 300) 
 
+# load the distance df if you don't have it
+
+data_dist_avg_path <- file.path(dataset_folder, "/meanDist_pertrial.csv")
+data_dist_avg <- read_csv(data_dist_avg_path)
+
+
 # plot the same but for each word
 plot2 <- ggplot(data_dist_avg, aes(x = reorder(word, -Dist_mean), y = Dist_mean)) +
   geom_point(size = 2, color = viridis(1, option = "B"), position = position_dodge(width = 0.5)) +
@@ -453,8 +460,12 @@ plot2 <- ggplot(data_dist_avg, aes(x = reorder(word, -Dist_mean), y = Dist_mean)
   labs(title = "Average Distance Between Segments Across Concepts",
        x = "Concept", y = "Average Distance per Trial") +
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5), legend.position = "none", 
-        axis.text.x = element_text(angle = 45, hjust = 1)) 
+theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    legend.text = element_text(size = 20)  # Adjust the size value as needed
+  ) 
 
 # Define the file path and name for saving the plot
 plot_filename <- file.path(plots_folder, "MeanDist_concept.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
@@ -557,7 +568,176 @@ ggsave(plot_filename, plot4, width = 8, height = 6, dpi = 300)
 
 ```
 
+Let's try to play with IPUs
+```{r IPU}
 
+# load the dataset with distance matrix
+
+library(readr)
+
+matrix_path <- file.path(dataset_folder, "/distance_matrix.csv")
+data <- read_csv(matrix_path)
+
+# the rownames didn't save so we need to do that again
+
+# Set row names to be the column names
+rownames(data) <- names(data)
+
+# load the IPU df
+
+IPU_path <- file.path(dataset_folder, "/IPU_data.csv")
+IPU_data <- read_csv(IPU_path)
+
+
+# also load the df with lots of info
+df_path <- file.path(dataset_folder, "/meanDist_pertrial.csv")
+df <- read_csv(df_path)
+
+
+# merge df with IPU_data
+
+df_IPU <- merge(df, IPU_data, by = "ID", all.x = TRUE)
+
+```
+
+
+Let's plot number of IPUs
+```{r}
+
+ipu_count <- IPU_distance %>%
+  group_by(participant, trial) %>%
+  summarize(Unique_IPU_count = n_distinct(IPU_count))
+
+# merge df with IPU_data
+
+df_IPU <- merge(df_IPU, ipu_count, by = c("participant", "trial"), all.x = TRUE)
+
+
+ipu_trial_plot <- ggplot(df_IPU, aes(x = word, y = Unique_IPU_count)) +
+  geom_point(size = 2, color = viridis(1, option = "A"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "",
+       x = "Concept", y = "Number of IPUs per trial", size= 2) +
+  theme_minimal() +
+theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    legend.text = element_text(size = 20)  # Adjust the size value as needed
+  ) 
+
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "IPU_per_trial.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, ipu_trial_plot, width = 8, height = 6, dpi = 300) 
+
+
+```
+How many segments is in IPU
+```{r}
+
+ipu_segment_count <- IPU_distance %>%
+  group_by(ID_IPU) %>%
+  summarize(Unique_IPU_segment_count = n_distinct(segmentCount))
+
+# merge df with IPU_data
+
+df_IPU <- merge(df_IPU, ipu_segment_count, by = "ID_IPU", all.x = TRUE)
+
+ipu_plot <- ggplot(df_IPU, aes(x = word, y = Unique_IPU_segment_count)) +
+  geom_point(size = 1, color = viridis(1, option = "A"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "",
+       x = "Concept", y = "Number of sounds between pauses", size= 20) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    legend.text = element_text(size = 20)  # Adjust the size value as needed
+  ) 
+
+# Define the file path and name for saving the plot
+plot_filename <- file.path(plots_folder, "sounds_per_IPU.png")  # You can choose the file format (e.g., PNG, PDF, etc.)
+
+# Save the plot in high resolution to the specified folder and filename
+ggsave(plot_filename, ipu_plot, width = 8, height = 6, dpi = 300) 
+
+```
+
+
+Let's get the distance measures for IPUs
+```{r}
+
+library(dplyr)
+
+IDs_list <- df_IPU %>%
+  group_by(ID_IPU) %>%
+  summarise(Unique_IDs = list(unique(ID))) %>%
+  ungroup()
+
+# Calculate a mean distance for each of the list-trial
+
+# Initialize a vector to store mean distances
+mean_distances <- numeric()
+
+
+# Loop through each combination in the 'result' data frame
+for (i in 1:nrow(IDs_list)) {
+  # Extract the list of unique IDs for the current combination
+  id_list <- IDs_list$Unique_IDs[[i]]
+  
+  # Select the relevant rows and columns in the distance matrix
+  subset_matrix <- data[id_list, id_list]
+
+  # Calculate the mean distance for the current combination
+  mean_segments <- sapply(subset_matrix, mean, na.rm = TRUE) # mean(df) does not work
+  mean_distance <- mean(mean_segments)
+  
+  # Append the mean distance to the vector
+  mean_distances <- c(mean_distances, mean_distance)
+}
+
+
+# Now let's append the mean distance within trial to the ID list
+
+IDs_list$Dist_mean <- NA
+IDs_list$Dist_mean <- mean_distances
+
+
+# merge the original df with avg distance
+IPU_distance <- merge(df_IPU, IDs_list, by.x = "ID_IPU", by.y = "ID_IPU")
+
+
+# delete the unique list so we can save it
+#data_dist_avg_pcn <- data_dist_avg_pcn %>%
+ # select(-Unique_IDs)
+
+# Create the full file path including the folder and file name
+#output_file <- paste0(dataset_folder, "/meanDist_perpcn.csv")
+
+# Save the data frame as a CSV file
+#write.csv(data_dist_avg_pcn, file = output_file, row.names = FALSE)
+
+# Create a ggplot
+
+library(ggplot2)
+library(viridis)
+
+ggplot(IPU_distance, aes(x = reorder(category, -Dist_mean.y), y = Dist_mean.y)) +
+  geom_point(size = 2, color = viridis(1, option = "A"), position = position_dodge(width = 0.5)) +
+  geom_boxplot(width = 0.2, fill = viridis(1), alpha = 0.5, position = position_dodge(width = 0.5)) +
+  labs(title = "Average Distance Between IPUs Across Categories",
+       x = "Category", y = "Average Distance per IPU") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+
+
+
+```
 
 
 
