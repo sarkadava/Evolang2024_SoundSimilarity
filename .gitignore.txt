@@ -1,2 +1,0 @@
-# Ignore WAV files in the "data" directory
-data/*.wav
