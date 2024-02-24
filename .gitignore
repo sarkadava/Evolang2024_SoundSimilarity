@@ -10,3 +10,8 @@ Cutting_segments.ipynb
 Cutting_segments.ipynb
 IPUs_script.py
 Cutting_segments.ipynb
+data/structure.csv
+data_viz.py
+plots/IPU_per_trial.png
+plots/sounds_per_IPU.png
+plots/sounds_per_IPU_jitter.png
