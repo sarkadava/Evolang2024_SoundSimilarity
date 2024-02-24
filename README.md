@@ -1,6 +1,6 @@
 # Exploring the sound structure of novel vocalizations (Repository for paper submitted to Evolang XV)
 
-# Folder structure
+## Folder structure
 
 The repository contains RMarkdown with code to analyse sound similarity in novel vocalizations.
 
@@ -23,3 +23,6 @@ In the <i> datasets </i>, you can find the following files:
 <li>meanDist_pertrial: complete dataset with all metadata, used features, plus mean calculated from 'distance_matrix' within a trial (i.e., concrete realization of a concept by a participant)</li>
 <li>meanDist_perpcn: complete dataset with all metadata, used features, plus mean calculated from 'distance_matrix' within a participant (ignoring trial differentiation)</li>
 
+## Contact
+
+fuchs@leibniz-zas.de / kadava@leibniz-zas.de
