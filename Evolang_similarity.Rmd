@@ -30,6 +30,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This is an RMarkdown accompanying paper 'Exploring the sound structure of novel vocalizations' submitted for Evolang 2024. Here we provide the script for similarity analysis of sound signal.
 
+Cite: Fuchs, S., Kadavá, Š., Pouw, W., Walker, B., Fay, N., Winter, B. & Cwiek, A.(2024) Exploring the sound structure of novel vocalizations. Proceedings of the 15th International Conference on the Evolution of Language (EvoLang XV)
+
 First we set up our folders
 ```{r folders, message=FALSE, warning=FALSE}
 
@@ -102,7 +104,7 @@ More info here: https://www.rdocumentation.org/packages/soundgen/versions/2.6.0 
 
 
 Now we extract summary of features in segments
-```{r soundgen, segments, warning=FALSE}
+```{r soundgen, segments, warning=FALSE, message=FALSE}
 
 
 # this is an empty data frame where we store the features
@@ -141,7 +143,7 @@ for (file in audio_files) {
 row.names(feature_df) <- NULL
 
 # let's inspect the data frame
-print(feature_df)
+#print(feature_df)
 
 # and save it
 output_file <- paste0(dataset_folder, "/segments_soundgen_summary.csv")
@@ -161,7 +163,7 @@ data <- read_csv(dataset_path)
 
 Before we start to compute the distances, we need to prepare the dataframe to more manageable form.
 
-```{r data wrangling, warning=FALSE}
+```{r data wrangling, warning=FALSE, message=FALSE}
 
 # get the info about each trial
 data <- data %>%
@@ -188,7 +190,7 @@ data <- data %>%
 
 
 Now we also need to get some information about the concepts that the segments belong to
-```{r category info, warning=FALSE}
+```{r category info, warning=FALSE, message=FALSE}
 
 # mapping between concepts and categories
 concept_category_mapping <- data.frame(
@@ -208,7 +210,7 @@ data <- data %>%
 ```
 
 Additionaly, we decided to take into account only mean and sd, as the mean might be more representative of the variability within the segment then a median (since it's not always linear)
-```{r median out, warning=FALSE}
+```{r median out, warning=FALSE, message=FALSE}
 
 # get the column names and keep only those that do not contain 'median'
 column_names <- names(data)
@@ -218,7 +220,7 @@ data <- data[, columns_to_keep]
 ```
 
 Let's also remove columns where the values are mostly NAs, they are not really informative
-```{r NAs out, warning=FALSE}
+```{r NAs out, warning=FALSE, message=FALSE}
 
 # function to remove columns with NA values
 remove_columns_with_na <- function(dataset) {
@@ -233,7 +235,6 @@ remove_columns_with_na <- function(dataset) {
 
 # remove columns with NAs
 data <- remove_columns_with_na(data)
-print(data)
 
 # we also got some warning for roughness, so let's just delete them
 column_names <- names(data)
@@ -308,7 +309,7 @@ Let's take a look on the inter-segment distance. Some of the concepts' segments 
 
 Let's take distance of segments based on the features
 Better don't run it, takes an hour or so. Load the interseg df
-```{r intersegment distance}
+```{r intersegment distance, warning=FALSE, message=FALSE}
 
 # Euclidean distance between segments and feature set
 # distance segement1(s1) with segment2 (s2) is the distance between a feature set if s1 (f1) and s2 (f2), where distance(s1,s2) = sqrt(f1_feature1-f2_feature1)^2+...+  (f1_featurei-f2_featurej)^2)
