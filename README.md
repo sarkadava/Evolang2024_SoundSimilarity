@@ -13,6 +13,9 @@ The repository contains RMarkdown with code to analyse sound similarity in novel
 The repository contains: 
 1. <i>data</i> - file with duration of each segment (the original .wav files are not publicly available)
 2. <i> datasets </i> - datasets that have been used to perform analysis and make plots 
+3. <i>plots</i> - note that the _sns plots (that are also used in the paper) were created using a Python script.
+
+In the <i> datasets </i>, you can find the following files:
 <ul>
 <li>distance_matrix: matrix of distances between a segment and all other segments</li>
 <li>segments_soundgen_summary: ouput of soundgen() function</li>
@@ -20,4 +23,3 @@ The repository contains:
 <li>meanDist_pertrial: complete dataset with all metadata, used features, plus mean calculated from 'distance_matrix' within a trial (i.e., concrete realization of a concept by a participant)</li>
 <li>meanDist_perpcn: complete dataset with all metadata, used features, plus mean calculated from 'distance_matrix' within a participant (ignoring trial differentiation)</li>
 
-3. <i>plots</i> - note that the _sns plots (that are also used in the paper) were created using a Python script.
